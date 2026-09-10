@@ -42,7 +42,7 @@ ocredit = -1    # Requires at least 1 special character (!@#$, etc.)
 
 ## 🔍 Parameter Breakdown & Mechanics
 
-    Key Rule in pwquality.conf: Setting a credit value (dcredit, ucredit, lcredit, ocredit) to a negative integer converts it from an optional bonus credit into a mandatory minimum requirement.
+Key Rule in `pwquality.conf`: Setting a credit value (`dcredit`, `ucredit`, `lcredit`, `ocredit`) to a negative integer converts it from an optional bonus credit into a mandatory minimum requirement.
 
 | Parameter | Value | Functional Description | Security Impact |
 | :--- | :--- | :--- | :--- |
