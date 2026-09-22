@@ -1,8 +1,8 @@
-# Linux Password Complexity Enforcement (`pam_pwquality`)
+# Linux Password Complexity & Account Lockout Enforcement (`PAM`)
 
-This repository provides a production-ready configuration for enforcing corporate password complexity rules across Linux systems using `pam_pwquality`. 
+This repository provides a production-ready configuration for enforcing corporate password complexity rules via `pam_pwquality` and automated brute-force protection via `pam_faillock` across Linux systems using Pluggable Authentication Modules (PAM).
 
-In enterprise environments, implementing password complexity via PAM (Pluggable Authentication Modules) serves as a **Technical Control** that enforces an organization's **Managerial Password Policy**.
+In enterprise environments, implementing these controls acts as a critical **Technical Control** that enforces an organization's **Managerial Security Policy**.
 
 ---
 
@@ -14,12 +14,10 @@ Before configuring `pwquality.conf`, the `pam_pwquality` module must be installe
 | :--- | :--- | :--- |
 | **Debian / Ubuntu / Kali / Mint** | `libpam-pwquality` | `sudo apt update && sudo apt install libpam-pwquality` |
 | **RHEL / CentOS / Fedora / Rocky** | `pam_pwquality` | `sudo dnf install pam_pwquality` |
-| **Arch Linux / Manjaro** | `libpwquality` | `sudo pacman -S libpwquality` |
-| **openSUSE / SLES** | `pam_pwquality` | `sudo zypper install pam_pwquality` |
 
 ---
 
-## ⚙️ Configuration (`/etc/security/pwquality.conf`)
+## ⚙️ Password Complexity Configuration (`/etc/security/pwquality.conf`)
 
 Place the following configuration into `/etc/security/pwquality.conf`:
 
@@ -40,9 +38,9 @@ lcredit = -1    # Requires at least 1 lowercase letter (a-z)
 ocredit = -1    # Requires at least 1 special character (!@#$, etc.)
 ```
 
-## 🔍 Parameter Breakdown & Mechanics
+### 🔍 Parameter Breakdown & Mechanics
 
-    Key Rule in pwquality.conf: Setting a credit value (dcredit, ucredit, lcredit, ocredit) to a negative integer converts it from an optional bonus credit into a mandatory minimum requirement.
+*Key Rule*: Setting credit values to a negative integer converts them from optional bonus credits into mandatory minimum requirements.
 
 | Parameter | Value | Functional Description | Security Impact |
 | :--- | :--- | :--- | :--- |
@@ -53,26 +51,124 @@ ocredit = -1    # Requires at least 1 special character (!@#$, etc.)
 | `ocredit` | `-1` | Mandates at least 1 special character/symbol. | Defeats basic alphanumeric wordlists. |
 | `difork` | `4` | Requires 4 characters in the new password to differ from the old one. | Prevents users from making minor single-character changes during password resets. |
 
-## 🛠️ PAM Stack Integration
+## Account Lockout Configuration (`/etc/security/faillock.conf`)
 
-Installing `libpam-pwquality` on Debian/Ubuntu/Kali automatically registers the module in `/etc/pam.d/common-password`.
-Verify that your PAM password stack includes the `pam_pwquality.so` directive:
-
-```ini
-# /etc/pam.d/common-password
-password    requisite    pam_pwquality.so retry=3
+To protect accounts against brute-force and credential-stuffing attacks without manually corrupting low-level stack files, configure `pam_faillock` globally.
+1. Open or create `/etc/security/faillock.conf`:
+```Bash
+sudo vim /etc/security/faillock.conf
 ```
 
-(On RHEL/Fedora systems, manage PAM integration using `sudo authselect enable-feature with-pwquality`).
+2. Add the following production-ready parameters:
+```Plaintext
+# Configuration for locking the user after multiple failed
+# authentication attempts.
+#
+# The directory where the user files with the failure records are kept.
+# The default is /var/run/faillock.
+# dir = /var/run/faillock
+#
+# Will log the user name into the system log if the user is not found.
+# Enabled if option is present.
+# audit
+#
+# Don't print informative messages.
+# Enabled if option is present.
+# silent
+#
+# Don't log informative messages via syslog.
+# Enabled if option is present.
+# no_log_info
+#
+# Only track failed user authentications attempts for local users
+# in /etc/passwd and ignore centralized (AD, IdM, LDAP, etc.) users.
+# The `faillock` command will also no longer track user failed
+# authentication attempts. Enabling this option will prevent a
+# double-lockout scenario where a user is locked out locally and
+# in the centralized mechanism.
+# Enabled if option is present.
+# local_users_only
+#
+# Deny access if the number of consecutive authentication failures
+# for this user during the recent interval exceeds n tries.
+# The default is 3.
+deny = 3
+#
+# The length of the interval during which the consecutive
+# authentication failures must happen for the user account
+# lock out is <replaceable>n</replaceable> seconds.
+# The default is 900 (15 minutes).
+fail_interval = 900
+#
+# The access will be re-enabled after n seconds after the lock out.
+# The value 0 has the same meaning as value `never` - the access
+# will not be re-enabled without resetting the faillock
+# entries by the `faillock` command.
+# The default is 600 (10 minutes).
+unlock_time = 600
+#
+# Root account can become locked as well as regular accounts.
+# Enabled if option is present.
+even_deny_root
+#
+# This option implies the `even_deny_root` option.
+# Allow access after n seconds to root account after the
+# account is locked. In case the option is not specified
+# the value is the same as of the `unlock_time` option.
+# root_unlock_time = 900
+#
+# If a group name is specified with this option, members
+# of the group will be handled by this module the same as
+# the root account (the options `even_deny_root>` and
+# `root_unlock_time` will apply to them.
+# By default, the option is not set.
+# admin_group = <admin_group_name>
+```
+
+## 🛠️ PAM Stack Integration & Management
+
+Rather than manually editing core files like `/etc/pam.d/common-auth` (which risks syntax corruption and system lockouts), use Debian's native utility to safely register modules:
+
+1. **Password Stack** (`/etc/pam.d/common-password`): Installing libpam-pwquality automatically registers the module. Verify the line exists:
+```Plaintext
+password    requisite     pam_pwquality.so retry=3
+```
+
+2. **Authentication / Lockout Stack** (`pam-auth-update`): Enable lockout features safely through the interactive Debian utility:
+```Bash
+sudo pam-auth-update
+```
+
+Ensure the following essential profiles are selected (`[*]`):
+
+- [*] Unix authentication
+- [*] Account lockout handling (faillock) (if available as a profile)
+- [*] Pwquality password strength checking
+- [*] Maintain wtmp database
+- [*] Register user sessions in the systemd control group hierarchy
 
 ## 🧪 Testing & Verification
-To verify that PAM is actively enforcing these rules:
-1. Attempt to change a standard (non-root) user password: `passwd <username>`
 
-1. Test a short or weak password (e.g., Password1!).
-2. **Expected Output**:
+1. **Verify Password Complexity Rules**:
 
-```ini
-BAD PASSWORD: The password is shorter than 14 characters
-Authentication token manipulation error
+    1. Attempt to change a user password: `passwd <username>`
+    2. Test a short or weak password (e.g., Password1!).
+    3. **Expected Output**:
+    ```ini
+    BAD PASSWORD: The password is shorter than 14 characters
+    Authentication token manipulation error
+    ```
+
+2. **Verify Account Lockout Status**:
+
+    1. Check failure counts for a specific user:
+```Bash
+sudo faillock --user <username>
 ```
+    2. Manually clear lockout records:
+```Bash
+sudo faillock --user <username> --reset
+```
+
+
+
