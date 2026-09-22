@@ -162,13 +162,13 @@ Ensure the following essential profiles are selected (`[*]`):
 2. **Verify Account Lockout Status**:
 
     1. Check failure counts for a specific user:
-```Bash
-sudo faillock --user <username>
-```
+    ```Bash
+    sudo faillock --user <username>
+    ```
     2. Manually clear lockout records:
-```Bash
-sudo faillock --user <username> --reset
-```
+    ```Bash
+    sudo faillock --user <username> --reset
+    ```
 
 
 
