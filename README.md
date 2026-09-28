@@ -66,7 +66,7 @@ sudo vim /etc/security/faillock.conf
 #
 # The directory where the user files with the failure records are kept.
 # The default is /var/run/faillock.
-# dir = /var/run/faillock
+dir = /var/lib/faillock
 #
 # Will log the user name into the system log if the user is not found.
 # Enabled if option is present.
@@ -115,7 +115,7 @@ even_deny_root
 # Allow access after n seconds to root account after the
 # account is locked. In case the option is not specified
 # the value is the same as of the `unlock_time` option.
-# root_unlock_time = 900
+root_unlock_time = 900
 #
 # If a group name is specified with this option, members
 # of the group will be handled by this module the same as
@@ -125,27 +125,18 @@ even_deny_root
 # admin_group = <admin_group_name>
 ```
 
-## 🛠️ PAM Stack Integration & Management
+## 🛠️ Managing via pam-auth-update
 
-Rather than manually editing core files like `/etc/pam.d/common-auth` (which risks syntax corruption and system lockouts), use Debian's native utility to safely register modules:
+Operational Warning: Avoid manual text edits of core shared files like `/etc/pam.d/common-auth` or `/etc/pam.d/common-account`. Manual injection mistakes (such as mixing auth blocks into account files) will corrupt the PAM chain and cause unexpected permission lockouts. Always use Debian's native utility to manage modules.
 
-1. **Password Stack** (`/etc/pam.d/common-password`): Installing libpam-pwquality automatically registers the module. Verify the line exists:
-```Plaintext
-password    requisite     pam_pwquality.so retry=3
-```
+### Managing via `pam-auth-update`
 
-2. **Authentication / Lockout Stack** (`pam-auth-update`): Enable lockout features safely through the interactive Debian utility:
+To safely enable and register account lockout handling across all system services:
 ```Bash
-sudo pam-auth-update
+sudo pam-auth-update --enable faillock
 ```
 
-Ensure the following essential profiles are selected (`[*]`):
-
-- [*] Unix authentication
-- [*] Account lockout handling (faillock) (if available as a profile)
-- [*] Pwquality password strength checking
-- [*] Maintain wtmp database
-- [*] Register user sessions in the systemd control group hierarchy
+This safely wires the required `preauth` and `authfail` logic into `common-auth` and appends `account required pam_faillock.so` into `common-account` under the hood.
 
 ## 🧪 Testing & Verification
 
