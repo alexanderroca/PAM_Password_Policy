@@ -115,7 +115,7 @@ even_deny_root
 # Allow access after n seconds to root account after the
 # account is locked. In case the option is not specified
 # the value is the same as of the `unlock_time` option.
-root_unlock_time = 900
+root_unlock_time = 300
 #
 # If a group name is specified with this option, members
 # of the group will be handled by this module the same as
